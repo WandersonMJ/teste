@@ -34,7 +34,7 @@ interface UploadModalProps {
 // Constants
 const DEFAULT_ALLOWED_TYPES: string[] = [
   'image/jpeg',
-  'image/png', 
+  'image/png',
   'image/gif',
   'application/pdf',
   'text/plain',
@@ -64,13 +64,13 @@ const UploadModal: React.FC<UploadModalProps> = ({
   // Estados internos do componente
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [isDragging, setIsDragging] = useState<boolean>(false);
-  
+
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Atualizar status dos arquivos baseado nas props externas
   useEffect(() => {
     if (files.length > 0) {
-      setFiles(prevFiles => 
+      setFiles(prevFiles =>
         prevFiles.map(file => {
           if (isLoading) {
             return {
@@ -118,30 +118,30 @@ const UploadModal: React.FC<UploadModalProps> = ({
 
   const validateFile = (file: File, currentFilesCount: number = files.length): FileValidation => {
     if (!allowedTypes.includes(file.type)) {
-      return { 
-        valid: false, 
-        error: `Tipo de arquivo não permitido: ${file.type}` 
+      return {
+        valid: false,
+        error: `Tipo de arquivo não permitido: ${file.type}`
       };
     }
-    
+
     if (file.size > maxFileSize) {
-      return { 
-        valid: false, 
-        error: `Arquivo muito grande. Máximo: ${formatFileSize(maxFileSize)}` 
+      return {
+        valid: false,
+        error: `Arquivo muito grande. Máximo: ${formatFileSize(maxFileSize)}`
       };
     }
-    
+
     if (maxFiles === 1) {
       return { valid: true };
     }
-    
+
     if (currentFilesCount >= maxFiles) {
-      return { 
-        valid: false, 
-        error: `Número máximo de arquivos atingido: ${maxFiles}` 
+      return {
+        valid: false,
+        error: `Número máximo de arquivos atingido: ${maxFiles}`
       };
     }
-    
+
     return { valid: true };
   };
 
@@ -160,7 +160,7 @@ const UploadModal: React.FC<UploadModalProps> = ({
       const file = fileArray[0];
       if (file) {
         const validation: FileValidation = validateFile(file, 0);
-        
+
         if (validation.valid) {
           const uploadFile: UploadFile = {
             id: generateFileId(),
@@ -182,7 +182,7 @@ const UploadModal: React.FC<UploadModalProps> = ({
 
     fileArray.forEach((file: File) => {
       const validation: FileValidation = validateFile(file, files.length + validFiles.length);
-      
+
       if (validation.valid) {
         const uploadFile: UploadFile = {
           id: generateFileId(),
@@ -226,24 +226,24 @@ const UploadModal: React.FC<UploadModalProps> = ({
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
-    
+
     const droppedFiles: FileList = e.dataTransfer.files;
     handleFileSelect(droppedFiles);
   };
 
   const removeFile = (fileId: string): void => {
     if (isLoading) return;
-    
+
     setFiles((prev: UploadFile[]) => prev.filter(f => f.id !== fileId));
   };
 
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
-    
+
     const k: number = 1024;
     const sizes: string[] = ['Bytes', 'KB', 'MB', 'GB'];
     const i: number = Math.floor(Math.log(bytes) / Math.log(k));
-    
+
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
   };
 
@@ -314,7 +314,7 @@ const UploadModal: React.FC<UploadModalProps> = ({
         subtitle: `1 arquivo • Tamanho máximo: ${formatFileSize(maxFileSize)}`
       };
     }
-    
+
     return {
       title: 'Arraste arquivos aqui ou clique para selecionar',
       subtitle: `Máximo ${maxFiles} arquivos • Tamanho máximo: ${formatFileSize(maxFileSize)}`
@@ -332,11 +332,11 @@ const UploadModal: React.FC<UploadModalProps> = ({
   const modalTitle = title || `Upload de Arquivo${maxFiles > 1 ? 's' : ''}${maxFiles === 1 ? ' (Único)' : ''}`;
 
   return (
-    <div 
+    <div
       className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
       onClick={handleClose}
     >
-      <div 
+      <div
         className="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden"
         onClick={(e: React.MouseEvent) => e.stopPropagation()}
       >
@@ -348,11 +348,10 @@ const UploadModal: React.FC<UploadModalProps> = ({
           <button
             onClick={handleClose}
             disabled={isLoading}
-            className={`p-2 rounded-lg transition-colors duration-200 ${
-              isLoading 
-                ? 'opacity-50 cursor-not-allowed' 
+            className={`p-2 rounded-lg transition-colors duration-200 ${isLoading
+                ? 'opacity-50 cursor-not-allowed'
                 : 'hover:bg-gray-100'
-            }`}
+              }`}
             type="button"
           >
             <i className="fas fa-times text-gray-500"></i>
@@ -374,21 +373,19 @@ const UploadModal: React.FC<UploadModalProps> = ({
           {/* Drop Zone */}
           {!isLoading && (
             <div
-              className={`border-2 border-dashed rounded-lg p-8 text-center transition-all duration-300 ${
-                isLoading
+              className={`border-2 border-dashed rounded-lg p-8 text-center transition-all duration-300 ${isLoading
                   ? 'opacity-50 cursor-not-allowed'
                   : 'cursor-pointer'
-              } ${
-                isDragging 
-                  ? 'border-orange-500 bg-orange-50' 
+                } ${isDragging
+                  ? 'border-orange-500 bg-orange-50'
                   : 'border-gray-300 hover:border-gray-400'
-              } ${files.length >= maxFiles && maxFiles > 1 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                } ${files.length >= maxFiles && maxFiles > 1 ? 'opacity-50 cursor-not-allowed' : ''}`}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
               onClick={files.length >= maxFiles && maxFiles > 1 ? undefined : handleDropZoneClick}
             >
-              <i 
+              <i
                 className="fas fa-cloud-upload-alt text-4xl mb-4"
                 style={{ color: isDragging ? '#D04A02' : '#7D7D7D' }}
               ></i>
@@ -423,15 +420,15 @@ const UploadModal: React.FC<UploadModalProps> = ({
               </h3>
               <div className="space-y-3">
                 {files.map((file: UploadFile) => (
-                  <div 
+                  <div
                     key={file.id}
                     className="flex items-center p-4 bg-gray-50 rounded-lg border border-gray-200"
                   >
-                    <i 
+                    <i
                       className={`${getFileIcon(file.type)} text-2xl mr-4`}
                       style={{ color: getFileColor(file.type) }}
                     ></i>
-                    
+
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate" style={{ color: '#404040' }}>
                         {file.name}
@@ -439,14 +436,14 @@ const UploadModal: React.FC<UploadModalProps> = ({
                       <p className="text-sm" style={{ color: '#7D7D7D' }}>
                         {formatFileSize(file.size)} • {file.type}
                       </p>
-                      
+
                       {/* Progress Bar - controlada externamente */}
                       {(isLoading || file.status === 'uploading') && (
                         <div className="mt-2">
                           <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
+                            <div
                               className="h-2 rounded-full transition-all duration-300"
-                              style={{ 
+                              style={{
                                 width: `${uploadProgress}%`,
                                 backgroundColor: getProgressBarColor()
                               }}
@@ -464,7 +461,7 @@ const UploadModal: React.FC<UploadModalProps> = ({
                           </div>
                         </div>
                       )}
-                      
+
                       {file.status === 'completed' && !isLoading && (
                         <div className="flex items-center mt-2">
                           <i className="fas fa-check-circle text-green-500 mr-2"></i>
@@ -481,14 +478,16 @@ const UploadModal: React.FC<UploadModalProps> = ({
                         </div>
                       )}
                     </div>
-                    
+
+                    {/* Botão X para excluir arquivo - mais visível */}
                     {!isLoading && file.status !== 'uploading' && (
                       <button
                         onClick={() => removeFile(file.id)}
-                        className="ml-4 p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors duration-200"
+                        className="ml-4 p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors duration-200 flex items-center justify-center w-8 h-8 border border-red-200 hover:border-red-300"
                         type="button"
+                        title="Remover arquivo"
                       >
-                        <i className="fas fa-trash text-sm"></i>
+                        <i className="fas fa-times text-sm"></i>
                       </button>
                     )}
                   </div>
@@ -502,11 +501,10 @@ const UploadModal: React.FC<UploadModalProps> = ({
         <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
           <button
             onClick={handleClose}
-            className={`px-4 py-2 border border-gray-300 rounded-lg transition-colors duration-200 ${
-              isLoading
+            className={`px-4 py-2 border border-gray-300 rounded-lg transition-colors duration-200 ${isLoading
                 ? 'text-gray-400 bg-gray-100 cursor-not-allowed'
                 : 'text-gray-600 hover:bg-gray-50'
-            }`}
+              }`}
             disabled={isLoading}
             type="button"
           >
