@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 
 // Types and Interfaces
 interface UploadFile {
@@ -11,10 +11,6 @@ interface UploadFile {
   error?: string | null;
 }
 
-interface UploadProgress {
-  [fileId: string]: number;
-}
-
 interface FileValidation {
   valid: boolean;
   error?: string;
@@ -25,7 +21,11 @@ interface UploadModalProps {
   onClose: () => void;
   title?: string;
   isLoading: boolean;
-  onUploadComplete?: (files: UploadFile[]) => void;
+  uploadProgress?: number; // 0-100
+  uploadStatus?: string; // texto do status
+  uploadError?: string; // mensagem de erro
+  onUpload: (files: File[]) => void; // chamado quando botão upload é clicado
+  onUploadComplete?: () => void; // chamado quando upload é concluído
   allowedTypes?: string[];
   maxFileSize?: number;
   maxFiles?: number;
@@ -52,6 +52,10 @@ const UploadModal: React.FC<UploadModalProps> = ({
   onClose,
   title,
   isLoading,
+  uploadProgress = 0,
+  uploadStatus,
+  uploadError,
+  onUpload,
   onUploadComplete,
   allowedTypes = DEFAULT_ALLOWED_TYPES,
   maxFileSize = DEFAULT_MAX_FILE_SIZE,
@@ -59,19 +63,54 @@ const UploadModal: React.FC<UploadModalProps> = ({
 }) => {
   // Estados internos do componente
   const [files, setFiles] = useState<UploadFile[]>([]);
-  const [uploading, setUploading] = useState<boolean>(false);
-  const [uploadProgress, setUploadProgress] = useState<UploadProgress>({});
   const [isDragging, setIsDragging] = useState<boolean>(false);
   
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Atualizar status dos arquivos baseado nas props externas
+  useEffect(() => {
+    if (files.length > 0) {
+      setFiles(prevFiles => 
+        prevFiles.map(file => {
+          if (isLoading) {
+            return {
+              ...file,
+              status: 'uploading' as const,
+              error: uploadError || null
+            };
+          } else if (uploadError) {
+            return {
+              ...file,
+              status: 'error' as const,
+              error: uploadError
+            };
+          } else if (uploadProgress === 100 && !isLoading) {
+            return {
+              ...file,
+              status: 'completed' as const,
+              error: null
+            };
+          }
+          return file;
+        })
+      );
+    }
+  }, [isLoading, uploadProgress, uploadError, files.length]);
+
+  // Chamar onUploadComplete quando upload for concluído
+  useEffect(() => {
+    if (uploadProgress === 100 && !isLoading && files.length > 0 && files.every(f => f.status === 'completed')) {
+      if (onUploadComplete) {
+        onUploadComplete();
+      }
+    }
+  }, [uploadProgress, isLoading, files, onUploadComplete]);
+
   // Função para fechar o modal (só funciona se não estiver loading)
   const handleClose = () => {
-    if (!isLoading && !uploading) {
+    if (!isLoading) {
       // Limpar estados internos
       setFiles([]);
-      setUploadProgress({});
-      setUploading(false);
       setIsDragging(false);
       onClose();
     }
@@ -111,7 +150,7 @@ const UploadModal: React.FC<UploadModalProps> = ({
   };
 
   const handleFileSelect = (selectedFiles: FileList | null): void => {
-    if (!selectedFiles || isLoading || uploading) return;
+    if (!selectedFiles || isLoading) return;
 
     const fileArray: File[] = Array.from(selectedFiles);
     const validFiles: UploadFile[] = [];
@@ -133,7 +172,6 @@ const UploadModal: React.FC<UploadModalProps> = ({
             error: null
           };
           setFiles([uploadFile]);
-          setUploadProgress({});
           return;
         } else {
           alert(`${file.name}: ${validation.error}`);
@@ -171,7 +209,7 @@ const UploadModal: React.FC<UploadModalProps> = ({
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>): void => {
-    if (isLoading || uploading) return;
+    if (isLoading) return;
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(true);
@@ -184,7 +222,7 @@ const UploadModal: React.FC<UploadModalProps> = ({
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>): void => {
-    if (isLoading || uploading) return;
+    if (isLoading) return;
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
@@ -194,14 +232,9 @@ const UploadModal: React.FC<UploadModalProps> = ({
   };
 
   const removeFile = (fileId: string): void => {
-    if (isLoading || uploading) return;
+    if (isLoading) return;
     
     setFiles((prev: UploadFile[]) => prev.filter(f => f.id !== fileId));
-    setUploadProgress((prev: UploadProgress) => {
-      const newProgress = { ...prev };
-      delete newProgress[fileId];
-      return newProgress;
-    });
   };
 
   const formatFileSize = (bytes: number): string => {
@@ -232,47 +265,10 @@ const UploadModal: React.FC<UploadModalProps> = ({
     return '#6B7280';
   };
 
-  const simulateUpload = async (): Promise<void> => {
-    setUploading(true);
-    const pendingFiles: UploadFile[] = files.filter(f => f.status === 'pending');
-    
-    const uploadPromises = pendingFiles.map((file: UploadFile, index: number) => {
-      return new Promise<void>((resolve) => {
-        setTimeout(() => {
-          let progress: number = 0;
-          
-          setFiles((prev: UploadFile[]) => 
-            prev.map(f => f.id === file.id ? { ...f, status: 'uploading' } : f)
-          );
-
-          const interval = setInterval(() => {
-            progress += Math.random() * 25 + 5;
-            
-            if (progress >= 100) {
-              progress = 100;
-              clearInterval(interval);
-              
-              setFiles((prev: UploadFile[]) => 
-                prev.map(f => f.id === file.id ? { ...f, status: 'completed' } : f)
-              );
-              
-              resolve();
-            }
-            
-            setUploadProgress((prev: UploadProgress) => ({
-              ...prev,
-              [file.id]: Math.min(progress, 100)
-            }));
-          }, 150);
-        }, index * 300);
-      });
-    });
-
-    await Promise.all(uploadPromises);
-    setUploading(false);
-    
-    if (onUploadComplete) {
-      onUploadComplete(files.filter(f => f.status === 'completed'));
+  const handleUploadClick = (): void => {
+    if (files.length > 0 && onUpload) {
+      const filesToUpload = files.map(f => f.file);
+      onUpload(filesToUpload);
     }
   };
 
@@ -281,7 +277,7 @@ const UploadModal: React.FC<UploadModalProps> = ({
   };
 
   const handleDropZoneClick = (): void => {
-    if (!isLoading && !uploading) {
+    if (!isLoading) {
       fileInputRef.current?.click();
     }
   };
@@ -305,10 +301,10 @@ const UploadModal: React.FC<UploadModalProps> = ({
   };
 
   const getDropZoneText = (): { title: string; subtitle: string } => {
-    if (isLoading || uploading) {
+    if (isLoading) {
       return {
-        title: 'Aguarde...',
-        subtitle: 'Processamento em andamento'
+        title: uploadStatus || 'Processando...',
+        subtitle: 'Aguarde o processamento'
       };
     }
 
@@ -323,6 +319,11 @@ const UploadModal: React.FC<UploadModalProps> = ({
       title: 'Arraste arquivos aqui ou clique para selecionar',
       subtitle: `Máximo ${maxFiles} arquivos • Tamanho máximo: ${formatFileSize(maxFileSize)}`
     };
+  };
+
+  const getProgressBarColor = (): string => {
+    if (uploadError) return '#EF4444'; // Vermelho para erro
+    return '#D04A02'; // Laranja padrão
   };
 
   if (!isOpen) return null;
@@ -346,9 +347,9 @@ const UploadModal: React.FC<UploadModalProps> = ({
           </h2>
           <button
             onClick={handleClose}
-            disabled={isLoading || uploading}
+            disabled={isLoading}
             className={`p-2 rounded-lg transition-colors duration-200 ${
-              isLoading || uploading 
+              isLoading 
                 ? 'opacity-50 cursor-not-allowed' 
                 : 'hover:bg-gray-100'
             }`}
@@ -361,10 +362,12 @@ const UploadModal: React.FC<UploadModalProps> = ({
         {/* Content */}
         <div className="p-6 max-h-[calc(90vh-200px)] overflow-y-auto">
           {/* Loading Indicator */}
-          {isLoading && (
+          {isLoading && files.length === 0 && (
             <div className="flex items-center justify-center py-8">
               <i className="fas fa-spinner fa-spin text-2xl mr-3" style={{ color: '#D04A02' }}></i>
-              <span className="text-lg" style={{ color: '#404040' }}>Carregando...</span>
+              <span className="text-lg" style={{ color: '#404040' }}>
+                {uploadStatus || 'Carregando...'}
+              </span>
             </div>
           )}
 
@@ -372,7 +375,7 @@ const UploadModal: React.FC<UploadModalProps> = ({
           {!isLoading && (
             <div
               className={`border-2 border-dashed rounded-lg p-8 text-center transition-all duration-300 ${
-                uploading || isLoading
+                isLoading
                   ? 'opacity-50 cursor-not-allowed'
                   : 'cursor-pointer'
               } ${
@@ -407,13 +410,13 @@ const UploadModal: React.FC<UploadModalProps> = ({
                 className="hidden"
                 onChange={handleInputChange}
                 accept={getAcceptString()}
-                disabled={isLoading || uploading}
+                disabled={isLoading}
               />
             </div>
           )}
 
           {/* File List */}
-          {files.length > 0 && !isLoading && (
+          {files.length > 0 && (
             <div className="mt-6">
               <h3 className="text-lg font-medium mb-4" style={{ color: '#404040' }}>
                 {maxFiles === 1 ? 'Arquivo Selecionado' : `Arquivos Selecionados (${files.length}/${maxFiles})`}
@@ -437,43 +440,49 @@ const UploadModal: React.FC<UploadModalProps> = ({
                         {formatFileSize(file.size)} • {file.type}
                       </p>
                       
-                      {/* Progress Bar */}
-                      {(file.status === 'uploading' || file.status === 'pending') && 
-                       uploadProgress[file.id] !== undefined && (
+                      {/* Progress Bar - controlada externamente */}
+                      {(isLoading || file.status === 'uploading') && (
                         <div className="mt-2">
                           <div className="w-full bg-gray-200 rounded-full h-2">
                             <div 
                               className="h-2 rounded-full transition-all duration-300"
                               style={{ 
-                                width: `${uploadProgress[file.id]}%`,
-                                backgroundColor: '#D04A02'
+                                width: `${uploadProgress}%`,
+                                backgroundColor: getProgressBarColor()
                               }}
                             ></div>
                           </div>
-                          <p className="text-xs mt-1" style={{ color: '#7D7D7D' }}>
-                            {Math.round(uploadProgress[file.id] || 0)}%
-                          </p>
+                          <div className="flex justify-between items-center mt-1">
+                            <p className="text-xs" style={{ color: '#7D7D7D' }}>
+                              {Math.round(uploadProgress)}%
+                            </p>
+                            {uploadStatus && (
+                              <p className="text-xs" style={{ color: uploadError ? '#EF4444' : '#7D7D7D' }}>
+                                {uploadStatus}
+                              </p>
+                            )}
+                          </div>
                         </div>
                       )}
                       
-                      {file.status === 'completed' && (
+                      {file.status === 'completed' && !isLoading && (
                         <div className="flex items-center mt-2">
                           <i className="fas fa-check-circle text-green-500 mr-2"></i>
                           <span className="text-sm text-green-600">Upload concluído</span>
                         </div>
                       )}
 
-                      {file.status === 'error' && (
+                      {(file.status === 'error' || uploadError) && !isLoading && (
                         <div className="flex items-center mt-2">
                           <i className="fas fa-exclamation-circle text-red-500 mr-2"></i>
                           <span className="text-sm text-red-600">
-                            {file.error || 'Erro no upload'}
+                            {uploadError || file.error || 'Erro no upload'}
                           </span>
                         </div>
                       )}
                     </div>
                     
-                    {!uploading && !isLoading && file.status !== 'uploading' && (
+                    {!isLoading && file.status !== 'uploading' && (
                       <button
                         onClick={() => removeFile(file.id)}
                         className="ml-4 p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors duration-200"
@@ -494,26 +503,26 @@ const UploadModal: React.FC<UploadModalProps> = ({
           <button
             onClick={handleClose}
             className={`px-4 py-2 border border-gray-300 rounded-lg transition-colors duration-200 ${
-              isLoading || uploading
+              isLoading
                 ? 'text-gray-400 bg-gray-100 cursor-not-allowed'
                 : 'text-gray-600 hover:bg-gray-50'
             }`}
-            disabled={isLoading || uploading}
+            disabled={isLoading}
             type="button"
           >
             Cancelar
           </button>
           <button
-            onClick={simulateUpload}
-            disabled={files.length === 0 || uploading || isLoading || files.every(f => f.status === 'completed')}
+            onClick={handleUploadClick}
+            disabled={files.length === 0 || isLoading || files.every(f => f.status === 'completed')}
             className="px-6 py-2 text-white rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
             style={{ backgroundColor: '#D04A02' }}
             type="button"
           >
-            {uploading ? (
+            {isLoading ? (
               <>
                 <i className="fas fa-spinner fa-spin mr-2"></i>
-                Enviando...
+                {uploadStatus || 'Enviando...'}
               </>
             ) : (
               <>
