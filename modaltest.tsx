@@ -3,12 +3,13 @@ import React, { useState, useRef, useEffect } from 'react';
 // Types and Interfaces
 interface UploadFile {
   id: string;
-  file: File;
+  file: File | null; // null para arquivos fantasma
   name: string;
   size: number;
   type: string;
-  status: 'pending' | 'uploading' | 'completed' | 'error';
+  status: 'pending' | 'uploading' | 'completed' | 'error' | 'phantom';
   error?: string | null;
+  isPhantom?: boolean; // indica se é um arquivo fantasma
 }
 
 interface FileValidation {
@@ -29,6 +30,8 @@ interface UploadModalProps {
   allowedTypes?: string[];
   maxFileSize?: number;
   maxFiles?: number;
+  fileName?: string; // novo parâmetro para arquivo fantasma
+  onDeleteFile?: () => void; // callback para deletar arquivo fantasma
 }
 
 // Constants
@@ -59,7 +62,9 @@ const UploadModal: React.FC<UploadModalProps> = ({
   onUploadComplete,
   allowedTypes = DEFAULT_ALLOWED_TYPES,
   maxFileSize = DEFAULT_MAX_FILE_SIZE,
-  maxFiles = DEFAULT_MAX_FILES
+  maxFiles = DEFAULT_MAX_FILES,
+  fileName,
+  onDeleteFile
 }) => {
   // Estados internos do componente
   const [files, setFiles] = useState<UploadFile[]>([]);
@@ -67,11 +72,60 @@ const UploadModal: React.FC<UploadModalProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Reset do estado quando o modal abre/fecha
+  useEffect(() => {
+    if (isOpen) {
+      // Reset completo do estado quando o modal abre
+      setFiles([]);
+      setIsDragging(false);
+      
+      // Se fileName for fornecido, criar arquivo fantasma
+      if (fileName) {
+        const phantomFile: UploadFile = {
+          id: `phantom-${Date.now()}`,
+          file: null,
+          name: fileName,
+          size: 0,
+          type: getFileTypeFromName(fileName),
+          status: 'phantom',
+          error: null,
+          isPhantom: true
+        };
+        setFiles([phantomFile]);
+      }
+    } else {
+      // Limpar estado quando modal fecha
+      setFiles([]);
+      setIsDragging(false);
+    }
+  }, [isOpen, fileName]);
+
+  // Função para determinar o tipo do arquivo baseado no nome
+  const getFileTypeFromName = (name: string): string => {
+    const extension = name.toLowerCase().split('.').pop();
+    const typeMap: { [key: string]: string } = {
+      'jpg': 'image/jpeg',
+      'jpeg': 'image/jpeg',
+      'png': 'image/png',
+      'gif': 'image/gif',
+      'pdf': 'application/pdf',
+      'txt': 'text/plain',
+      'xls': 'application/vnd.ms-excel',
+      'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'doc': 'application/msword',
+      'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    };
+    return typeMap[extension || ''] || 'application/octet-stream';
+  };
+
   // Atualizar status dos arquivos baseado nas props externas
   useEffect(() => {
     if (files.length > 0) {
       setFiles(prevFiles =>
         prevFiles.map(file => {
+          // Não atualizar arquivos fantasma
+          if (file.isPhantom) return file;
+          
           if (isLoading) {
             return {
               ...file,
@@ -99,7 +153,8 @@ const UploadModal: React.FC<UploadModalProps> = ({
 
   // Chamar onUploadComplete quando upload for concluído
   useEffect(() => {
-    if (uploadProgress === 100 && !isLoading && files.length > 0 && files.every(f => f.status === 'completed')) {
+    const realFiles = files.filter(f => !f.isPhantom);
+    if (uploadProgress === 100 && !isLoading && realFiles.length > 0 && realFiles.every(f => f.status === 'completed')) {
       if (onUploadComplete) {
         onUploadComplete();
       }
@@ -109,14 +164,11 @@ const UploadModal: React.FC<UploadModalProps> = ({
   // Função para fechar o modal (só funciona se não estiver loading)
   const handleClose = () => {
     if (!isLoading) {
-      // Limpar estados internos
-      setFiles([]);
-      setIsDragging(false);
       onClose();
     }
   };
 
-  const validateFile = (file: File, currentFilesCount: number = files.length): FileValidation => {
+  const validateFile = (file: File, currentFilesCount: number = files.filter(f => !f.isPhantom).length): FileValidation => {
     if (!allowedTypes.includes(file.type)) {
       return {
         valid: false,
@@ -155,6 +207,7 @@ const UploadModal: React.FC<UploadModalProps> = ({
     const fileArray: File[] = Array.from(selectedFiles);
     const validFiles: UploadFile[] = [];
     const errors: string[] = [];
+    const currentRealFiles = files.filter(f => !f.isPhantom);
 
     if (maxFiles === 1) {
       const file = fileArray[0];
@@ -169,8 +222,10 @@ const UploadModal: React.FC<UploadModalProps> = ({
             size: file.size,
             type: file.type,
             status: 'pending',
-            error: null
+            error: null,
+            isPhantom: false
           };
+          // Substituir todos os arquivos (incluindo fantasmas) por este novo
           setFiles([uploadFile]);
           return;
         } else {
@@ -181,7 +236,7 @@ const UploadModal: React.FC<UploadModalProps> = ({
     }
 
     fileArray.forEach((file: File) => {
-      const validation: FileValidation = validateFile(file, files.length + validFiles.length);
+      const validation: FileValidation = validateFile(file, currentRealFiles.length + validFiles.length);
 
       if (validation.valid) {
         const uploadFile: UploadFile = {
@@ -191,7 +246,8 @@ const UploadModal: React.FC<UploadModalProps> = ({
           size: file.size,
           type: file.type,
           status: 'pending',
-          error: null
+          error: null,
+          isPhantom: false
         };
         validFiles.push(uploadFile);
       } else {
@@ -204,7 +260,11 @@ const UploadModal: React.FC<UploadModalProps> = ({
     }
 
     if (validFiles.length > 0) {
-      setFiles((prev: UploadFile[]) => [...prev, ...validFiles]);
+      setFiles((prev: UploadFile[]) => {
+        // Remover arquivos fantasma e adicionar novos arquivos reais
+        const realFiles = prev.filter(f => !f.isPhantom);
+        return [...realFiles, ...validFiles];
+      });
     }
   };
 
@@ -233,6 +293,13 @@ const UploadModal: React.FC<UploadModalProps> = ({
 
   const removeFile = (fileId: string): void => {
     if (isLoading) return;
+
+    const fileToRemove = files.find(f => f.id === fileId);
+    
+    if (fileToRemove?.isPhantom && onDeleteFile) {
+      // Se for arquivo fantasma, chamar callback de delete
+      onDeleteFile();
+    }
 
     setFiles((prev: UploadFile[]) => prev.filter(f => f.id !== fileId));
   };
@@ -266,8 +333,9 @@ const UploadModal: React.FC<UploadModalProps> = ({
   };
 
   const handleUploadClick = (): void => {
-    if (files.length > 0 && onUpload) {
-      const filesToUpload = files.map(f => f.file);
+    const realFiles = files.filter(f => !f.isPhantom && f.file);
+    if (realFiles.length > 0 && onUpload) {
+      const filesToUpload = realFiles.map(f => f.file!);
       onUpload(filesToUpload);
     }
   };
@@ -308,9 +376,18 @@ const UploadModal: React.FC<UploadModalProps> = ({
       };
     }
 
+    const realFiles = files.filter(f => !f.isPhantom);
+    const hasPhantomFile = files.some(f => f.isPhantom);
+
     if (maxFiles === 1) {
+      if (hasPhantomFile && realFiles.length === 0) {
+        return {
+          title: 'Clique para selecionar um novo arquivo',
+          subtitle: `1 arquivo • Tamanho máximo: ${formatFileSize(maxFileSize)}`
+        };
+      }
       return {
-        title: files.length > 0 ? 'Clique para substituir o arquivo' : 'Arraste um arquivo aqui ou clique para selecionar',
+        title: realFiles.length > 0 ? 'Clique para substituir o arquivo' : 'Arraste um arquivo aqui ou clique para selecionar',
         subtitle: `1 arquivo • Tamanho máximo: ${formatFileSize(maxFileSize)}`
       };
     }
@@ -330,6 +407,8 @@ const UploadModal: React.FC<UploadModalProps> = ({
 
   const dropZoneText = getDropZoneText();
   const modalTitle = title || `Upload de Arquivo${maxFiles > 1 ? 's' : ''}${maxFiles === 1 ? ' (Único)' : ''}`;
+  const realFiles = files.filter(f => !f.isPhantom);
+  const hasUploadableFiles = realFiles.length > 0;
 
   return (
     <div
@@ -379,11 +458,11 @@ const UploadModal: React.FC<UploadModalProps> = ({
                 } ${isDragging
                   ? 'border-orange-500 bg-orange-50'
                   : 'border-gray-300 hover:border-gray-400'
-                } ${files.length >= maxFiles && maxFiles > 1 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                } ${realFiles.length >= maxFiles && maxFiles > 1 ? 'opacity-50 cursor-not-allowed' : ''}`}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              onClick={files.length >= maxFiles && maxFiles > 1 ? undefined : handleDropZoneClick}
+              onClick={realFiles.length >= maxFiles && maxFiles > 1 ? undefined : handleDropZoneClick}
             >
               <i
                 className="fas fa-cloud-upload-alt text-4xl mb-4"
@@ -395,7 +474,7 @@ const UploadModal: React.FC<UploadModalProps> = ({
               <p className="text-sm" style={{ color: '#7D7D7D' }}>
                 {dropZoneText.subtitle}
               </p>
-              {files.length >= maxFiles && maxFiles > 1 && (
+              {realFiles.length >= maxFiles && maxFiles > 1 && (
                 <p className="text-sm text-red-500 mt-2">
                   Limite de arquivos atingido
                 </p>
@@ -416,29 +495,40 @@ const UploadModal: React.FC<UploadModalProps> = ({
           {files.length > 0 && (
             <div className="mt-6">
               <h3 className="text-lg font-medium mb-4" style={{ color: '#404040' }}>
-                {maxFiles === 1 ? 'Arquivo Selecionado' : `Arquivos Selecionados (${files.length}/${maxFiles})`}
+                {maxFiles === 1 ? 'Arquivo' : `Arquivos (${files.length}/${maxFiles})`}
               </h3>
               <div className="space-y-3">
                 {files.map((file: UploadFile) => (
                   <div
                     key={file.id}
-                    className="flex items-center p-4 bg-gray-50 rounded-lg border border-gray-200"
+                    className={`flex items-center p-4 rounded-lg border ${
+                      file.isPhantom 
+                        ? 'bg-blue-50 border-blue-200' 
+                        : 'bg-gray-50 border-gray-200'
+                    }`}
                   >
                     <i
                       className={`${getFileIcon(file.type)} text-2xl mr-4`}
-                      style={{ color: getFileColor(file.type) }}
+                      style={{ color: file.isPhantom ? '#3B82F6' : getFileColor(file.type) }}
                     ></i>
 
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate" style={{ color: '#404040' }}>
-                        {file.name}
-                      </p>
+                      <div className="flex items-center">
+                        <p className="font-medium truncate" style={{ color: '#404040' }}>
+                          {file.name}
+                        </p>
+                        {file.isPhantom && (
+                          <span className="ml-2 px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                            Arquivo Existente
+                          </span>
+                        )}
+                      </div>
                       <p className="text-sm" style={{ color: '#7D7D7D' }}>
-                        {formatFileSize(file.size)} • {file.type}
+                        {file.isPhantom ? 'Arquivo no servidor' : `${formatFileSize(file.size)} • ${file.type}`}
                       </p>
 
                       {/* Progress Bar - controlada externamente */}
-                      {(isLoading || file.status === 'uploading') && (
+                      {(isLoading || file.status === 'uploading') && !file.isPhantom && (
                         <div className="mt-2">
                           <div className="w-full bg-gray-200 rounded-full h-2">
                             <div
@@ -462,14 +552,14 @@ const UploadModal: React.FC<UploadModalProps> = ({
                         </div>
                       )}
 
-                      {file.status === 'completed' && !isLoading && (
+                      {file.status === 'completed' && !isLoading && !file.isPhantom && (
                         <div className="flex items-center mt-2">
                           <i className="fas fa-check-circle text-green-500 mr-2"></i>
                           <span className="text-sm text-green-600">Upload concluído</span>
                         </div>
                       )}
 
-                      {(file.status === 'error' || uploadError) && !isLoading && (
+                      {(file.status === 'error' || uploadError) && !isLoading && !file.isPhantom && (
                         <div className="flex items-center mt-2">
                           <i className="fas fa-exclamation-circle text-red-500 mr-2"></i>
                           <span className="text-sm text-red-600">
@@ -479,13 +569,17 @@ const UploadModal: React.FC<UploadModalProps> = ({
                       )}
                     </div>
 
-                    {/* Botão X para excluir arquivo - mais visível */}
+                    {/* Botão X para excluir arquivo */}
                     {!isLoading && file.status !== 'uploading' && (
                       <button
                         onClick={() => removeFile(file.id)}
-                        className="ml-4 p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors duration-200 flex items-center justify-center w-8 h-8 border border-red-200 hover:border-red-300"
+                        className={`ml-4 p-2 rounded-full transition-colors duration-200 flex items-center justify-center w-8 h-8 border ${
+                          file.isPhantom
+                            ? 'text-blue-500 hover:bg-blue-100 border-blue-200 hover:border-blue-300'
+                            : 'text-red-500 hover:bg-red-50 border-red-200 hover:border-red-300'
+                        }`}
                         type="button"
-                        title="Remover arquivo"
+                        title={file.isPhantom ? "Remover arquivo do servidor" : "Remover arquivo"}
                       >
                         <i className="fas fa-times text-sm"></i>
                       </button>
@@ -512,7 +606,7 @@ const UploadModal: React.FC<UploadModalProps> = ({
           </button>
           <button
             onClick={handleUploadClick}
-            disabled={files.length === 0 || isLoading || files.every(f => f.status === 'completed')}
+            disabled={!hasUploadableFiles || isLoading || realFiles.every(f => f.status === 'completed')}
             className="px-6 py-2 text-white rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
             style={{ backgroundColor: '#D04A02' }}
             type="button"
@@ -535,4 +629,94 @@ const UploadModal: React.FC<UploadModalProps> = ({
   );
 };
 
-export default UploadModal;
+// Exemplo de uso
+function App() {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  // Simulação de lista de itens
+  const items = [
+    { id: 1, name: 'Item 1', fileName: 'documento1.pdf' },
+    { id: 2, name: 'Item 2', fileName: null },
+    { id: 3, name: 'Item 3', fileName: 'planilha.xlsx' },
+    { id: 4, name: 'Item 4', fileName: null }
+  ];
+
+  const handleItemClick = (item) => {
+    setSelectedItem(item);
+    setIsModalOpen(true);
+  };
+
+  const handleUpload = (files) => {
+    setIsLoading(true);
+    setUploadProgress(0);
+    
+    // Simulação de upload
+    const interval = setInterval(() => {
+      setUploadProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          setIsLoading(false);
+          return 100;
+        }
+        return prev + 10;
+      });
+    }, 200);
+  };
+
+  const handleDeleteFile = () => {
+    console.log('Deletar arquivo do servidor:', selectedItem?.fileName);
+    // Aqui você chamaria a API para deletar o arquivo
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedItem(null);
+    setIsLoading(false);
+    setUploadProgress(0);
+  };
+
+  return (
+    <div className="p-8">
+      <h1 className="text-2xl font-bold mb-6">Lista de Itens</h1>
+      
+      <div className="space-y-2">
+        {items.map(item => (
+          <div
+            key={item.id}
+            onClick={() => handleItemClick(item)}
+            className="p-4 border rounded-lg cursor-pointer hover:bg-gray-50 flex justify-between items-center"
+          >
+            <span className="font-medium">{item.name}</span>
+            <div className="flex items-center space-x-2">
+              {item.fileName && (
+                <span className="text-sm text-green-600 bg-green-100 px-2 py-1 rounded">
+                  <i className="fas fa-file mr-1"></i>
+                  {item.fileName}
+                </span>
+              )}
+              <i className="fas fa-upload text-gray-400"></i>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <UploadModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        title={`Upload para ${selectedItem?.name}`}
+        isLoading={isLoading}
+        uploadProgress={uploadProgress}
+        uploadStatus={isLoading ? 'Enviando arquivo...' : undefined}
+        onUpload={handleUpload}
+        fileName={selectedItem?.fileName}
+        onDeleteFile={handleDeleteFile}
+        maxFiles={1}
+      />
+    </div>
+  );
+}
+
+export default App;
