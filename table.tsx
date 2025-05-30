@@ -65,22 +65,17 @@ interface ListItem {
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200" style={{ backgroundColor: '#FAFAFA' }}>
           <div className="grid grid-cols-12 gap-4">
-            <div className="col-span-8 md:col-span-4">
+            <div className="col-span-8 md:col-span-5">
               <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
                 Nome
               </h3>
             </div>
-            <div className="hidden md:block md:col-span-4">
+            <div className="hidden md:block md:col-span-5">
               <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
                 Descrição
               </h3>
             </div>
-            <div className="hidden md:block md:col-span-2">
-              <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
-                Arquivo
-              </h3>
-            </div>
-            <div className="col-span-4 md:col-span-2 text-right">
+            <div className="col-span-4 md:col-span-2 text-center">
               <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
                 Status
               </h3>
@@ -104,19 +99,17 @@ interface ListItem {
             data.map((item, index) => (
               <div
                 key={index}
-                className={`grid grid-cols-12 gap-4 px-6 py-4 transition-colors duration-150 cursor-pointer hover:bg-gray-50 focus:bg-gray-50 focus:outline-none ${
-                  index % 2 === 1 ? 'bg-gray-25' : 'bg-white'
-                }`}
+                className="grid grid-cols-12 gap-4 px-6 py-4 transition-all duration-150 cursor-pointer hover:opacity-50 focus:bg-gray-50 focus:outline-none"
                 onClick={() => handleItemClick(item)}
                 onKeyDown={(e) => handleKeyDown(e, item)}
                 tabIndex={0}
                 role="button"
                 style={{
-                  backgroundColor: index % 2 === 1 ? '#FEFEFE' : '#FFFFFF'
+                  backgroundColor: index % 2 === 1 ? '#F8F9FA' : '#FFFFFF'
                 }}
               >
                 {/* Nome */}
-                <div className="col-span-8 md:col-span-4 flex items-center min-w-0">
+                <div className="col-span-8 md:col-span-5 flex items-center min-w-0">
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium truncate" style={{ color: '#404040' }}>
                       {item.name}
@@ -125,35 +118,18 @@ interface ListItem {
                     <p className="text-xs mt-1 truncate md:hidden" style={{ color: '#7D7D7D' }}>
                       {item.description}
                     </p>
-                    {/* Arquivo no mobile */}
-                    {item.fileName && (
-                      <p className="text-xs mt-1 truncate md:hidden" style={{ color: '#9CA3AF' }}>
-                        📄 {item.fileName}
-                      </p>
-                    )}
                   </div>
                 </div>
   
                 {/* Descrição - Desktop apenas */}
-                <div className="hidden md:block md:col-span-4 flex items-center min-w-0">
+                <div className="hidden md:block md:col-span-5 flex items-center min-w-0">
                   <p className="text-sm truncate" style={{ color: '#7D7D7D' }}>
                     {item.description}
                   </p>
                 </div>
   
-                {/* Arquivo - Desktop apenas */}
-                <div className="hidden md:block md:col-span-2 flex items-center min-w-0">
-                  {item.fileName ? (
-                    <p className="text-sm truncate" style={{ color: '#9CA3AF' }}>
-                      📄 {item.fileName}
-                    </p>
-                  ) : (
-                    <span className="text-sm" style={{ color: '#D1D5DB' }}>-</span>
-                  )}
-                </div>
-  
                 {/* Status */}
-                <div className="col-span-4 md:col-span-2 flex items-center justify-end">
+                <div className="col-span-4 md:col-span-2 flex items-center justify-center">
                   {item.status && <Badge status={item.status} size="sm" />}
                 </div>
               </div>
