@@ -54,9 +54,10 @@ const Badge: React.FC<BadgeProps> = ({ status, size = 'md' }) => {
   );
 };
 
-// CorporateList Component com funcionalidade de upload
+// CorporateList Component - Lista com Drag & Drop
 const CorporateList: React.FC<CorporateListProps> = ({ data, onItemsAdded, isLoading }) => {
   const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [isHovering, setIsHovering] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
@@ -76,7 +77,6 @@ const CorporateList: React.FC<CorporateListProps> = ({ data, onItemsAdded, isLoa
   const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     event.stopPropagation();
-    // Só remove o estado se realmente saiu do componente
     if (!event.currentTarget.contains(event.relatedTarget as Node)) {
       setIsDraggingOver(false);
     }
@@ -94,7 +94,7 @@ const CorporateList: React.FC<CorporateListProps> = ({ data, onItemsAdded, isLoa
     }
   };
 
-  const triggerFileSelect = () => {
+  const handleClick = () => {
     if (isLoading) return;
     fileInputRef.current?.click();
   };
@@ -105,19 +105,29 @@ const CorporateList: React.FC<CorporateListProps> = ({ data, onItemsAdded, isLoa
     if (files.length > 0) {
       onItemsAdded(files);
     }
-    // Limpa o input para permitir selecionar o mesmo arquivo novamente
     if (event.target) event.target.value = "";
+  };
+
+  const handleMouseEnter = () => {
+    if (!isLoading) setIsHovering(true);
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovering(false);
   };
 
   return (
     <div
-      className={`relative bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden ${
-        isDraggingOver ? 'border-blue-500 border-dashed bg-blue-50' : ''
-      } ${isLoading ? 'opacity-60' : ''}`}
+      className={`relative bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden cursor-pointer transition-all duration-200 ${
+        isDraggingOver ? 'border-blue-500 border-dashed' : ''
+      } ${isLoading ? 'opacity-60 cursor-not-allowed' : 'hover:shadow-md'}`}
       onDragOver={handleDragOver}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
+      onClick={handleClick}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       <input 
         type="file" 
@@ -141,15 +151,18 @@ const CorporateList: React.FC<CorporateListProps> = ({ data, onItemsAdded, isLoa
         </div>
       )}
       
-      {/* Overlay para arrastar arquivos */}
-      {isDraggingOver && !isLoading && (
+      {/* Overlay de Hover */}
+      {(isHovering || isDraggingOver) && !isLoading && (
         <div className="absolute inset-0 z-20 flex items-center justify-center bg-blue-500 bg-opacity-10">
-          <div className="text-center">
+          <div className="text-center bg-white bg-opacity-95 px-8 py-6 rounded-lg shadow-lg">
             <svg className="mx-auto h-12 w-12 text-blue-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
-            <p className="text-xl font-semibold text-blue-600">
-              Solte os arquivos aqui
+            <p className="text-lg font-semibold text-blue-600 mb-2">
+              {isDraggingOver ? 'Solte os arquivos aqui' : 'Clique aqui para realizar o upload das planilhas'}
+            </p>
+            <p className="text-sm text-gray-600">
+              {isDraggingOver ? '' : 'ou arraste e solte os arquivos'}
             </p>
           </div>
         </div>
@@ -176,21 +189,18 @@ const CorporateList: React.FC<CorporateListProps> = ({ data, onItemsAdded, isLoa
         </div>
       </div>
 
-      {/* Content - mesma estilização do Table */}
+      {/* Content - Lista dos arquivos */}
       <div className="divide-y divide-gray-200">
         {data.length === 0 ? (
-          <div 
-            className="px-6 py-12 text-center cursor-pointer hover:bg-gray-50 transition-colors duration-150" 
-            onClick={triggerFileSelect}
-          >
+          <div className="px-6 py-12 text-center">
             <svg className="mx-auto h-12 w-12 mb-4" style={{ color: '#7D7D7D' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
             <p className="text-lg font-medium mb-2" style={{ color: '#404040' }}>
-              Arraste e solte seus arquivos aqui
+              Nenhum arquivo na lista
             </p>
             <p className="text-sm" style={{ color: '#7D7D7D' }}>
-              ou <span className="font-semibold text-blue-600">clique para selecionar</span>
+              Clique ou arraste arquivos para fazer upload
             </p>
           </div>
         ) : (
@@ -230,21 +240,6 @@ const CorporateList: React.FC<CorporateListProps> = ({ data, onItemsAdded, isLoa
           ))
         )}
       </div>
-
-      {/* Botão de adicionar arquivos quando há itens */}
-      {data.length > 0 && !isLoading && (
-        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
-          <button
-            onClick={triggerFileSelect}
-            className="w-full px-4 py-2 text-sm text-blue-600 border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors duration-200 flex items-center justify-center"
-          >
-            <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Adicionar mais arquivos
-          </button>
-        </div>
-      )}
     </div>
   );
 };
@@ -252,50 +247,50 @@ const CorporateList: React.FC<CorporateListProps> = ({ data, onItemsAdded, isLoa
 // --- DEMO APP ---
 
 function App() {
-  const [listItems, setListItems] = useState<ListItem[]>([]);
+  const [listItems, setListItems] = useState<ListItem[]>([
+    {
+      name: 'Relatório de Vendas Q1',
+      description: 'Planilha com dados de vendas do primeiro trimestre',
+      status: 'empty'
+    },
+    {
+      name: 'Análise de Performance',
+      description: 'Dados de performance dos sistemas',
+      status: 'succeed'
+    },
+    {
+      name: 'Backup de Clientes',
+      description: 'Base completa de dados de clientes',
+      status: 'pending'
+    },
+    {
+      name: 'Documentação API',
+      description: 'Especificações técnicas da API REST',
+      status: 'updated'
+    },
+    {
+      name: 'Log de Erros',
+      description: 'Arquivo de log do sistema',
+      status: 'empty'
+    }
+  ]);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleItemsAdded = (files: File[]): void => {
-    // Simula validação de arquivos
-    const validFiles = files.filter(file => file.size <= 10 * 1024 * 1024); // Máximo 10MB
-    const invalidFiles = files.filter(file => file.size > 10 * 1024 * 1024);
-
-    // Mostra arquivos inválidos
-    if (invalidFiles.length > 0) {
-      alert(`${invalidFiles.length} arquivo(s) foram rejeitados por exceder 10MB`);
-    }
-
-    if (validFiles.length === 0) return;
-
-    // Cria os itens visuais com status 'pending' para feedback imediato
-    const newPendingItems: ListItem[] = validFiles.map(file => ({
-      name: file.name,
-      description: `Aguardando envio (${(file.size / 1024).toFixed(2)} KB)`,
-      status: 'pending',
-      fileName: file.name
-    }));
-
-    setListItems(prevItems => [...prevItems, ...newPendingItems]);
-    setIsLoading(true);
+    console.log('Arquivos recebidos:', files.map(f => f.name));
     
-    console.log('Iniciando upload para:', validFiles.map(f => f.name));
+    setIsLoading(true);
 
-    // Simula processo de upload com diferentes resultados
+    // Simula processo de upload
     setTimeout(() => {
-      console.log('Upload concluído');
-      
-      setListItems(currentItems => 
-        currentItems.map(item => {
-          const matchingPendingItem = newPendingItems.find(pendingItem => pendingItem.name === item.name);
-          if (matchingPendingItem) {
-            // 90% de sucesso, 10% de erro simulado
-            const isSuccess = Math.random() > 0.1;
+      // Atualiza alguns itens para simular o resultado do upload
+      setListItems(currentItems =>
+        currentItems.map((item, index) => {
+          if (index < files.length) {
             return {
               ...item,
-              status: isSuccess ? 'succeed' : 'empty',
-              description: isSuccess 
-                ? 'Enviado com sucesso' 
-                : 'Falha no envio - tente novamente'
+              status: Math.random() > 0.2 ? 'succeed' : 'updated',
+              description: `${item.description} - Atualizado com sucesso`
             };
           }
           return item;
@@ -303,120 +298,99 @@ function App() {
       );
 
       setIsLoading(false);
-    }, 2000);
+      console.log('Upload concluído');
+    }, 2500);
   };
 
-  const clearList = () => {
-    setListItems([]);
-  };
-
-  const retryFailed = () => {
-    const failedItems = listItems.filter(item => item.status === 'empty');
-    if (failedItems.length === 0) return;
-
-    // Marca como pending novamente
-    setListItems(currentItems =>
-      currentItems.map(item =>
-        item.status === 'empty'
-          ? { ...item, status: 'pending', description: 'Tentando novamente...' }
-          : item
-      )
+  const resetList = () => {
+    setListItems(prevItems =>
+      prevItems.map(item => ({
+        ...item,
+        status: 'empty',
+        description: item.description.replace(' - Atualizado com sucesso', '')
+      }))
     );
-
-    setIsLoading(true);
-
-    // Simula novo upload
-    setTimeout(() => {
-      setListItems(currentItems =>
-        currentItems.map(item =>
-          failedItems.some(failed => failed.name === item.name)
-            ? { ...item, status: 'succeed', description: 'Enviado com sucesso' }
-            : item
-        )
-      );
-      setIsLoading(false);
-    }, 1500);
   };
 
-  const failedCount = listItems.filter(item => item.status === 'empty').length;
   const successCount = listItems.filter(item => item.status === 'succeed').length;
+  const updatedCount = listItems.filter(item => item.status === 'updated').length;
   const pendingCount = listItems.filter(item => item.status === 'pending').length;
+  const emptyCount = listItems.filter(item => item.status === 'empty').length;
 
   return (
     <div className="min-h-screen bg-gray-100 p-8">
       <div className="max-w-6xl mx-auto">
         <h1 className="text-3xl font-bold mb-2" style={{ color: '#404040' }}>
-          Painel de Upload de Arquivos
+          Sistema de Upload de Planilhas
         </h1>
         <p className="mb-8" style={{ color: '#7D7D7D' }}>
-          Arraste arquivos para a lista abaixo ou clique para selecionar. 
-          Máximo de 10MB por arquivo.
+          Lista dos arquivos esperados pelo sistema. Clique na lista ou arraste arquivos para fazer upload.
         </p>
 
         {/* Estatísticas */}
-        {listItems.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white p-4 rounded-lg shadow-sm">
-              <p className="text-2xl font-bold" style={{ color: '#404040' }}>
-                {listItems.length}
-              </p>
-              <p className="text-sm" style={{ color: '#7D7D7D' }}>
-                Total de arquivos
-              </p>
-            </div>
-            <div className="bg-white p-4 rounded-lg shadow-sm">
-              <p className="text-2xl font-bold text-green-600">
-                {successCount}
-              </p>
-              <p className="text-sm" style={{ color: '#7D7D7D' }}>
-                Enviados com sucesso
-              </p>
-            </div>
-            <div className="bg-white p-4 rounded-lg shadow-sm">
-              <p className="text-2xl font-bold text-yellow-600">
-                {pendingCount}
-              </p>
-              <p className="text-sm" style={{ color: '#7D7D7D' }}>
-                Aguardando envio
-              </p>
-            </div>
-            <div className="bg-white p-4 rounded-lg shadow-sm">
-              <p className="text-2xl font-bold text-red-600">
-                {failedCount}
-              </p>
-              <p className="text-sm" style={{ color: '#7D7D7D' }}>
-                Falharam
-              </p>
-            </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className="bg-white p-4 rounded-lg shadow-sm">
+            <p className="text-2xl font-bold text-green-600">
+              {successCount}
+            </p>
+            <p className="text-sm" style={{ color: '#7D7D7D' }}>
+              Sucesso
+            </p>
           </div>
-        )}
+          <div className="bg-white p-4 rounded-lg shadow-sm">
+            <p className="text-2xl font-bold text-blue-600">
+              {updatedCount}
+            </p>
+            <p className="text-sm" style={{ color: '#7D7D7D' }}>
+              Atualizados
+            </p>
+          </div>
+          <div className="bg-white p-4 rounded-lg shadow-sm">
+            <p className="text-2xl font-bold text-yellow-600">
+              {pendingCount}
+            </p>
+            <p className="text-sm" style={{ color: '#7D7D7D' }}>
+              Pendentes
+            </p>
+          </div>
+          <div className="bg-white p-4 rounded-lg shadow-sm">
+            <p className="text-2xl font-bold text-gray-600">
+              {emptyCount}
+            </p>
+            <p className="text-sm" style={{ color: '#7D7D7D' }}>
+              Vazios
+            </p>
+          </div>
+        </div>
 
-        {/* Botões de ação */}
-        <div className="mb-6 flex gap-4 justify-end">
-          {failedCount > 0 && (
-            <button
-              onClick={retryFailed}
-              className="px-4 py-2 text-sm text-yellow-700 bg-yellow-50 border border-yellow-300 rounded-lg hover:bg-yellow-100 transition-colors duration-200 disabled:opacity-50"
-              disabled={isLoading}
-            >
-              Tentar novamente ({failedCount})
-            </button>
-          )}
+        {/* Botão de reset */}
+        <div className="mb-6 flex justify-end">
           <button
-            onClick={clearList}
-            className="px-4 py-2 text-sm text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition-colors duration-200 disabled:opacity-50"
-            disabled={isLoading || listItems.length === 0}
+            onClick={resetList}
+            className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors duration-200 disabled:opacity-50"
+            disabled={isLoading}
           >
-            Limpar Lista
+            Reset Status
           </button>
         </div>
 
-        {/* Componente principal */}
+        {/* Componente principal - Lista interativa */}
         <CorporateList
           data={listItems}
           isLoading={isLoading}
           onItemsAdded={handleItemsAdded}
         />
+
+        {/* Instruções */}
+        <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <h3 className="font-semibold text-blue-900 mb-2">Como usar:</h3>
+          <ul className="text-sm text-blue-800 space-y-1">
+            <li>• <strong>Hover:</strong> Passe o mouse sobre a lista para ver a mensagem de upload</li>
+            <li>• <strong>Click:</strong> Clique em qualquer lugar da lista para abrir o seletor de arquivos</li>
+            <li>• <strong>Drag & Drop:</strong> Arraste arquivos diretamente para a lista</li>
+            <li>• <strong>Loading:</strong> Durante o upload, a lista fica opaca com loading</li>
+          </ul>
+        </div>
       </div>
     </div>
   );
