@@ -1,4 +1,4 @@
-function encontrarStringMaisProxima(stringBusca, arrayStrings) {
+function encontrarStringMaisProxima(stringBusca: string, arrayStrings: string[]): string | null {
   if (!arrayStrings || arrayStrings.length === 0) {
     return null;
   }
@@ -47,12 +47,12 @@ function encontrarStringMaisProxima(stringBusca, arrayStrings) {
 }
 
 // Função auxiliar para calcular similaridade entre duas strings
-function calcularSimilaridade(str1, str2) {
+function calcularSimilaridade(str1: string, str2: string): number {
   const len1 = str1.length;
   const len2 = str2.length;
   
   // Matriz para programação dinâmica (Levenshtein distance)
-  const matriz = Array(len1 + 1).fill().map(() => Array(len2 + 1).fill(0));
+  const matriz: number[][] = Array(len1 + 1).fill(null).map(() => Array(len2 + 1).fill(0));
   
   // Inicializa primeira linha e coluna
   for (let i = 0; i <= len1; i++) matriz[i][0] = i;
@@ -80,7 +80,7 @@ function calcularSimilaridade(str1, str2) {
 }
 
 // Exemplos de uso
-const arrayExemplo = ['campinas', 'R293', 'R075'];
+const arrayExemplo: string[] = ['campinas', 'R293', 'R075'];
 
 console.log('Testando os exemplos:');
 console.log(`'1. profissionais_campinas' => ${encontrarStringMaisProxima('1. profissionais_campinas', arrayExemplo)}`);
